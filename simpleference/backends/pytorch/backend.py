@@ -1,4 +1,5 @@
 import os
+import datetime
 import numpy as np
 
 import dill
@@ -29,7 +30,7 @@ class PyTorchPredict(object):
             bb = (slice(None),) + bb
         return out[bb]
 
-    def __call__(self, input_data):
+    def __call__(self, input_data, offset=None):
         assert isinstance(input_data, np.ndarray)
         assert input_data.ndim == 3
         # Note: in the code that follows, the GPU is locked for the 3 steps:
@@ -37,6 +38,7 @@ class PyTorchPredict(object):
         # better performance by only locking in step 2, or steps 1-2, or steps
         # 2-3. We should perform this experiment and then choose the best
         # option for our hardware (and then remove this comment! ;)
+        t0 = datetime.now()
         with self.lock:
             # 1. Transfer the data to the GPU
             torch_data = Variable(torch.from_numpy(input_data[None, None])
@@ -50,6 +52,14 @@ class PyTorchPredict(object):
             out = predicted_on_gpu.cpu().data.numpy().squeeze()
         if self.crop is not None:
             out = self.apply_crop(out)
+
+        # log block inference time
+        t1 = datetime.now()
+        t_diff = t1 - t0
+        log_file = 't_offset_%s.txt' % '_'.join(map(str, offset)) if offset is not None else\
+            't_offset.txt'
+        with open(log_file, 'w') as f:
+            f.write(t_diff.microseconds)
         return out
 
 
