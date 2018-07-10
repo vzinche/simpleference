@@ -1,5 +1,5 @@
 import os
-import datetime
+import time
 import numpy as np
 
 import dill
@@ -38,12 +38,12 @@ class PyTorchPredict(object):
         # better performance by only locking in step 2, or steps 1-2, or steps
         # 2-3. We should perform this experiment and then choose the best
         # option for our hardware (and then remove this comment! ;)
-        t0 = datetime.now()
-        with self.lock:
+        t0 = time.time()
+        with self.lock, torch.no_grad():
             # 1. Transfer the data to the GPU
             torch_data = Variable(torch.from_numpy(input_data[None, None])
-                                  .cuda(self.gpu), volatile=True)
-            print('predicting a block!')
+                                  .cuda(self.gpu))
+            # print('predicting a block!')
             # 2. Run the model
             predicted_on_gpu = self.model(torch_data)
             if isinstance(predicted_on_gpu, tuple):
@@ -54,12 +54,12 @@ class PyTorchPredict(object):
             out = self.apply_crop(out)
 
         # log block inference time
-        t1 = datetime.now()
+        t1 = time.time()
         t_diff = t1 - t0
         log_file = 't_offset_%s.txt' % '_'.join(map(str, offset)) if offset is not None else\
             't_offset.txt'
         with open(log_file, 'w') as f:
-            f.write(t_diff.microseconds)
+            f.write(str(t_diff))
         return out
 
 
@@ -73,6 +73,6 @@ class InfernoPredict(PyTorchPredict):
         # validate cropping
         if crop is not None:
             assert isinstance(crop, (list, tuple))
-            assert len(crop) == 3
+            assert len(crop) == 3, str(crop)
         self.crop = crop
         self.lock = threading.Lock()

@@ -184,7 +184,8 @@ def run_inference(prediction,
     # iterate over all the offsets, get the input data and predict
     results = []
     for offset in offset_list:
-        output = tz.pipe(offset, log, load_offset, preprocess, predict)
+        output = tz.pipe(offset, log, load_offset, preprocess)
+        output = predict(output, offset)
         output_crop, output_bounding_box = verify_shape(offset, output)
         if postprocess is not None:
             output_crop = postprocess(output_crop, output_bounding_box)
