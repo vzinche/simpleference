@@ -30,7 +30,7 @@ class PyTorchPredict(object):
 
     def __call__(self, input_data):
         assert isinstance(input_data, np.ndarray)
-        assert input_data.ndim == 3
+        assert input_data.ndim == 3 or  input_data.ndim == 4 # we can have channels also :)
         # Note: in the code that follows, the GPU is locked for the 3 steps:
         # CPU -> GPU, GPU inference, GPU -> CPU. It may well be that we get
         # better performance by only locking in step 2, or steps 1-2, or steps
@@ -38,7 +38,8 @@ class PyTorchPredict(object):
         # option for our hardware (and then remove this comment! ;)
         with self.lock, torch.no_grad():
             # 1. Transfer the data to the GPU
-            torch_data = torch.from_numpy(input_data[None, None]).cuda(self.gpu)
+            torch_data = torch.from_numpy(input_data[None]).cuda(self.gpu)
+            if torch_data.dim() == 4: torch_data=torch_data[None]
             print('predicting a block!')
             # 2. Run the model
             predicted_on_gpu = self.model(torch_data)

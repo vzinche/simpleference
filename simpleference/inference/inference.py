@@ -11,9 +11,13 @@ from .io import IoN5, IoHDF5  # IoDVID
 
 
 def load_input(io, offset, context, output_shape, padding_mode='reflect'):
+    shape = io.shape
+    if len(shape)==4: 
+        has_channels=True
+        shape=shape[1:]
+        
     starts = [off - context[i] for i, off in enumerate(offset)]
     stops = [off + output_shape[i] + context[i] for i, off in enumerate(offset)]
-    shape = io.shape
 
     # we pad the input volume if necessary
     pad_left = None
@@ -30,6 +34,7 @@ def load_input(io, offset, context, output_shape, padding_mode='reflect'):
         stops = [min(shape[i], stop) for i, stop in enumerate(stops)]
 
     bb = tuple(slice(start, stop) for start, stop in zip(starts, stops))
+    if has_channels: bb = (slice(0, None), ) + bb
     data = io.read(bb)
 
     # pad if necessary
@@ -37,7 +42,8 @@ def load_input(io, offset, context, output_shape, padding_mode='reflect'):
         pad_left = (0, 0, 0) if pad_left is None else pad_left
         pad_right = (0, 0, 0) if pad_right is None else pad_right
         pad_width = tuple((pl, pr) for pl, pr in zip(pad_left, pad_right))
-        data = np.pad(data, pad_width, mode=padding_mode)
+        if has_channels: pad_width = ((0,0),) + pad_width
+        data = np.pad(data, pad_width, mode=padding_mode)  
 
     return data
 
@@ -142,6 +148,7 @@ def run_inference(prediction,
     context = context.astype('uint32')
 
     shape = io_in.shape
+    if len(shape)==4: shape=shape[1:] #we have channels
 
     @dask.delayed
     def load_offset(offset):
@@ -185,6 +192,7 @@ def run_inference(prediction,
     results = []
     for offset in offset_list:
         output = tz.pipe(offset, log, load_offset, preprocess, predict)
+        #print ('here output', output.shape)
         output_crop, output_bounding_box = verify_shape(offset, output)
         if postprocess is not None:
             output_crop = postprocess(output_crop, output_bounding_box)
